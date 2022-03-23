@@ -19,16 +19,21 @@ class System:
     def forward_kinamatics(self,joint_variables):
         # compensate in T0n with joint_variables & return x, y, z, phi, theta, psi
         tmp = self.T[-1].subs(joint_variables)
-        x = tmp[0,3]
-        y = tmp[1,3]
-        z = tmp[2,3]
+        x = tmp[0,3].evalf()
+        y = tmp[1,3].evalf()
+        z = tmp[2,3].evalf()
         phi = atan2(tmp[1,0], tmp[0,0])* 180/ pi
         psi = atan2(tmp[2,1], tmp[2,2])* 180/ pi
         theta = atan2(-tmp[2,0] * sin(phi), tmp[1,0])
         return [x, y, z, phi, theta, psi]
 
-    def inverse_kinamatics(self):
-        pass
+    # TODO: fix it does not get all acceptable outputs maybe use another function
+    def inverse_kinamatics(self,end_effector):
+        return solve([
+            Eq(end_effector[0], self.T[-1][0,3]),
+            Eq(end_effector[1], self.T[-1][1,3]),
+            Eq(end_effector[2], self.T[-1][2,3])
+            ])
 
     def jacobian(self):
         pass
@@ -43,19 +48,18 @@ class DH:
     def __init__(self, a, alpha, d, theta, joint_type, joint_number):
         self.a = a
         self.alpha = alpha
-        self.joint_type = joint_type # TODO: not needed ? 
-        self.joint_number = joint_number # TODO: not needed ?
+        # self.joint_type = joint_type
+        # self.joint_number = joint_number
         if joint_type == Joint.PRISMATIC :
-            self.d = Symbol('d{}'.format(joint_number))
+            self.d = Symbol('d{}'.format(joint_number),positive=True) + d
             self.theta = theta
         else :
-            self.theta = Symbol('t{}'.format(joint_number))
             self.d = d
+            self.theta = Symbol('t{}'.format(joint_number),positive=True)
 
     def get_A_matrix(self):
-        # return Matrix([[1,0,0,0],[0,self.theta,0,0],[0,0,self.theta,0],[0,0,0,self.theta]])
         return Matrix([[cos(self.theta), -sin(self.theta)*cos(self.alpha), sin(self.theta)*sin(self.alpha), self.a*cos(self.theta)],
-                [sin(self.theta), cos(self.theta)*sin(self.alpha), -cos(self.theta)*sin(self.alpha), self.a*sin(self.theta)],
+                [sin(self.theta), cos(self.theta)*cos(self.alpha), -cos(self.theta)*sin(self.alpha), self.a*sin(self.theta)],
                 [0.0, sin(self.alpha), cos(self.alpha), self.d],
                 [0.0, 0.0, 0.0, 1.0]])
 
@@ -65,24 +69,22 @@ class Joint(Enum):
 
 if __name__ == '__main__':
     # get num of joints, joints type and DH parameters from user
-    num_of_joints = int(input("enter number of joints: "))
+    # num_of_joints = int(input("enter number of joints: "))
 
-    DH_list = list()
-    for i in range(num_of_joints):
-        joint_type = int(input("enter joint {} type [1:prismatic|2:revolute]".format(i+1)))
-        print(joint_type)
-        a = float(input("a{} :".format(i+1)))
-        alpha = float(input("alpha{} :".format(i+1)))
-        if(joint_type == Joint.PRISMATIC.value):
-            theta = float(input("theta{} :".format(i+1)))
-            d = None
-        else :
-            d = float(input("d{} :".format(i+1)))
-            theta = None
-        DH_list.append(DH(a,alpha,d,theta,joint_type,i))
+    # DH_list = list()
+    # for i in range(num_of_joints):
+        # joint_type = int(input("enter joint {} type [1:prismatic|2:revolute]".format(i+1)))
+        # print(joint_type)
+        # a = float(input("a{} :".format(i+1)))
+        # alpha = float(input("alpha{} :".format(i+1)))
+        # d = float(input("d{} :".format(i+1)))
+        # if(joint_type == Joint.PRISMATIC.value):
+            # theta = float(input("theta{} :".format(i+1)))
+        # DH_list.append(DH(a,alpha,d,theta,joint_type,i))
     
     # enter 1:FK(q), 2:IK(p), 3:jacobian(), 4:trajectory()
-    system = System(DH_list)
-    # system = System([DH(0,0,.5,0,Joint.REVOLUTE,1),DH(0,-90,0,0,Joint.PRISMATIC,2),DH(0,0,0,0,Joint.PRISMATIC,3)])
-    # print(system.forward_kinamatics({'t1':pi/2,'d2':.1,'d3':.1}))
+    # system = System(DH_list)
+    system = System([DH(0,0,1,0,Joint.REVOLUTE,1),DH(0,-pi/2,0,0,Joint.PRISMATIC,2),DH(0,0,0,0,Joint.PRISMATIC,3)])
+    # print(system.forward_kinamatics({'t1':pi/2,'d2':.1,'d3':.1})) 
+    print(system.inverse_kinamatics(end_effector=[1,-1.2,2]))
     
