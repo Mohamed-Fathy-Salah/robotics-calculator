@@ -2,11 +2,15 @@ from enum import Enum
 from sympy import *
 
 class System:
-    # DH_matrix : list of DH objects
-    # A         : list of matrices contains A1, A2, ..., An
-    # T         : list of matrices contains T01, T02, ...,T0n
+    # DH_matrix  : list of DH objects
+    # A          : list of matrices contains A1, A2, ..., An
+    # T          : list of matrices contains T01, T02, ...,T0n
+    # joint_type : list of Joint object
     def __init__(self, DH_list):
+        self.joint_type = [i.joint_type for i in DH_list]
+
         self.A = [i.get_A_matrix() for i in DH_list]
+
         self.T = list()
         self.T.append(self.A[0])
         for i in range(1,len(DH_list)):
@@ -19,9 +23,9 @@ class System:
     def forward_kinamatics(self,joint_variables):
         # compensate in T0n with joint_variables & return x, y, z, phi, theta, psi
         tmp = self.T[-1].subs(joint_variables)
-        x = tmp[0,3].evalf()
-        y = tmp[1,3].evalf()
-        z = tmp[2,3].evalf()
+        x = tmp[0,3]
+        y = tmp[1,3]
+        z = tmp[2,3]
         phi = atan2(tmp[1,0], tmp[0,0])* 180/ pi
         psi = atan2(tmp[2,1], tmp[2,2])* 180/ pi
         theta = atan2(-tmp[2,0] * sin(phi), tmp[1,0])
@@ -35,8 +39,58 @@ class System:
             Eq(end_effector[2], self.T[-1][2,3])
             ])
 
-    def jacobian(self):
-        pass
+    def __jacobian(self,joint_variables):
+        # jacobian = [[0]*len(self.joint_type)]*6
+        jacobian = np.zeros((6,len(self.joint_type)))
+
+        T_n = self.T[-1].subs(joint_variables)
+        O_n = [T_n[0,3], T_n[1,3], T_n[2,3]]
+
+        if self.joint_type[0] == Joint.PRISMATIC:
+            # JV_0 = z_0 , JW_0 = 0
+            jacobian[2][0] = 1 # z0 = [0, 0, 1]
+        else:
+            # JV_0 = z_0 * O_n
+            jacobian [0:3, 0] = np.array([0, 0, 1]) * (np.array(O_n).reshape(-1,1))
+
+            # JW_0 = z_0
+            jacobian[5][0] = 1 # z0 = [0, 0, 1]
+
+        for i in range(1,len(self.joint_type)):
+            # z_i-1
+            tmp = self.T[i-1].subs(joint_variables)
+            z_last = [tmp[0,2], tmp[1,2], tmp[2,2]]
+            O_last = [tmp[0,3], tmp[1,3], tmp[2,3]]
+
+            if self.joint_type[i] == Joint.PRISMATIC:
+                # JV_i = z_i-1 , JW_i = 0
+                jacobian[0:3, i] = z_last
+            else:
+                # JV_i = z_i-1 * (O_n - O_i-1)
+                jacobian [0:3, i] = np.array(z_last) * (np.array(O_n - O_last).reshape(-1,1))
+
+                # JW_i = z_i-1
+                jacobian[3:6, i] = z_last
+
+        return jacobian
+    
+    def __delta(self,zeta_dot):
+        return np.array([
+            [0, -zeta_dot[5], zeta_dot[4], zeta_dot[0]],
+            [zeta_dot[5], 0, -zeta_dot[3], zeta_dot[1]],
+            [-zeta_dot[4], zeta_dot[3], 0, zeta_dot[2]],
+            [0,0,0,0] ])
+
+    # joint_velocity: dictionary of (str ,float)
+    def move(self,joint_variables,joint_velocity):
+        jacobian = self.__jacobian(joint_variables)
+        joint_velocity = joint_velocity.reshape(-1,1) # assure that it is of size (n*1)
+        zeta_dot = jacobian * joint_velocity 
+        delta = __delta(zeta_dot)
+
+        t_old = self.T[-1].subs(joint_variables)
+        t_new = t_old + delta * t_old
+        return t_new
 
     def trajectory(self):
         pass
@@ -48,14 +102,14 @@ class DH:
     def __init__(self, a, alpha, d, theta, joint_type, joint_number):
         self.a = a
         self.alpha = alpha
-        # self.joint_type = joint_type
+        self.joint_type = joint_type
         # self.joint_number = joint_number
         if joint_type == Joint.PRISMATIC :
             self.d = Symbol('d{}'.format(joint_number),positive=True) + d
             self.theta = theta
         else :
             self.d = d
-            self.theta = Symbol('t{}'.format(joint_number),positive=True)
+            self.theta = Symbol('t{}'.format(joint_number))
 
     def get_A_matrix(self):
         return Matrix([[cos(self.theta), -sin(self.theta)*cos(self.alpha), sin(self.theta)*sin(self.alpha), self.a*cos(self.theta)],
