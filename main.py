@@ -1,3 +1,4 @@
+import numpy as np
 from enum import Enum
 from sympy import *
 
@@ -40,10 +41,11 @@ class System:
             Eq(end_effector[2], self.T[-1][2,3])
             ])
 
-    def __jacobian(self,joint_variables):
-        # jacobian = [[0]*len(self.joint_type)]*6
-        jacobian = np.zeros((6,len(self.joint_type)))
+    # def jacob(self,joint_variables):
+    #     return self.__jacobian(joint_variables)
 
+    def __jacobian(self,joint_variables):
+        jacobian = np.zeros((6,len(self.joint_type)))
         T_n = self.T[-1].subs(joint_variables)
         O_n = [T_n[0,3], T_n[1,3], T_n[2,3]]
 
@@ -52,7 +54,7 @@ class System:
             jacobian[2][0] = 1 # z0 = [0, 0, 1]
         else:
             # JV_0 = z_0 * O_n
-            jacobian [0:3, 0] = np.array([0, 0, 1]) * (np.array(O_n).reshape(-1,1))
+            jacobian [0:3, 0] = np.cross(np.array([0, 0, 1]), np.array(O_n))
 
             # JW_0 = z_0
             jacobian[5][0] = 1 # z0 = [0, 0, 1]
@@ -68,7 +70,7 @@ class System:
                 jacobian[0:3, i] = z_last
             else:
                 # JV_i = z_i-1 * (O_n - O_i-1)
-                jacobian [0:3, i] = np.array(z_last) * (np.array(O_n - O_last).reshape(-1,1))
+                jacobian [0:3, i] = np.cross(np.array(z_last), np.array(O_n - O_last))
 
                 # JW_i = z_i-1
                 jacobian[3:6, i] = z_last
@@ -78,9 +80,9 @@ class System:
     # zeta_dot: list of shape(6*1)
     def __delta(self,zeta_dot):
         return np.array([
-            [0, -zeta_dot[5], zeta_dot[4], zeta_dot[0]],
-            [zeta_dot[5], 0, -zeta_dot[3], zeta_dot[1]],
-            [-zeta_dot[4], zeta_dot[3], 0, zeta_dot[2]],
+            [0, float(-zeta_dot[5]), float(zeta_dot[4]), float(zeta_dot[0])],
+            [float(zeta_dot[5]), 0, float(-zeta_dot[3]), float(zeta_dot[1])],
+            [float(-zeta_dot[4]), float(zeta_dot[3]), 0, float(zeta_dot[2])],
             [0,0,0,0] ])
 
     # joint_variables: dictionary of (str ,float)
@@ -88,13 +90,13 @@ class System:
     def move(self,joint_variables,joint_velocity):
         jacobian = self.__jacobian(joint_variables)
 
-        joint_velocity = joint_velocity.reshape(-1,1) # assure that it is of size (n*1)
+        joint_velocity = np.array(joint_velocity).reshape(-1,1) # assure that it is of size (n*1)
 
-        zeta_dot = jacobian * joint_velocity 
-        delta = __delta(zeta_dot)
+        zeta_dot = np.matmul(jacobian , joint_velocity)
+        delta = self.__delta(zeta_dot)
 
         t_old = self.T[-1].subs(joint_variables)
-        t_new = t_old + delta * t_old
+        t_new = np.add(t_old , np.dot(delta , t_old))
         return t_new
 
     def trajectory(self):
@@ -110,7 +112,7 @@ class DH:
         self.joint_type = joint_type
         # self.joint_number = joint_number
         if joint_type == Joint.PRISMATIC :
-            self.d = Symbol('d{}'.format(joint_number),positive=True) + d
+            self.d = Symbol('d{}'.format(joint_number)) + d
             self.theta = theta
         else :
             self.d = d
@@ -143,7 +145,9 @@ if __name__ == '__main__':
     
     # enter 1:FK(q), 2:IK(p), 3:jacobian(), 4:trajectory()
     # system = System(DH_list)
-    system = System([DH(0,0,1,0,Joint.REVOLUTE,1),DH(0,-pi/2,0,0,Joint.PRISMATIC,2),DH(0,0,0,0,Joint.PRISMATIC,3)])
-    # print(system.forward_kinamatics({'t1':pi/2,'d2':.1,'d3':.1})) 
-    print(system.inverse_kinamatics(end_effector=[1,-1.2,2]))
+    system = System([DH(0,0,.3,0,Joint.REVOLUTE,1),DH(0,-pi/2,0,0,Joint.PRISMATIC,2),DH(0,0,0,0,Joint.PRISMATIC,3)])
+    # print(system.forward_kinamatics({'t1':pi/2, 'd2':.1, 'd3':.1})) 
+    # print(system.inverse_kinamatics(end_effector=[1,-1.2,2]))
+    # print(system.jacob({'t1':pi/2, 'd2':.5, 'd3':.5}))
+    print(system.move({'t1':pi/2, 'd2':.5, 'd3':.5}, [pi/36, .01, .01]))
     
