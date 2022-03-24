@@ -32,6 +32,7 @@ class System:
         return [x, y, z, phi, theta, psi]
 
     # TODO: fix it does not get all acceptable outputs maybe use another function
+    # TODO: get the last 3 equations
     def inverse_kinamatics(self,end_effector):
         return solve([
             Eq(end_effector[0], self.T[-1][0,3]),
@@ -74,6 +75,7 @@ class System:
 
         return jacobian
     
+    # zeta_dot: list of shape(6*1)
     def __delta(self,zeta_dot):
         return np.array([
             [0, -zeta_dot[5], zeta_dot[4], zeta_dot[0]],
@@ -81,10 +83,13 @@ class System:
             [-zeta_dot[4], zeta_dot[3], 0, zeta_dot[2]],
             [0,0,0,0] ])
 
-    # joint_velocity: dictionary of (str ,float)
+    # joint_variables: dictionary of (str ,float)
+    # joint_velocity : list of shape (n*1)
     def move(self,joint_variables,joint_velocity):
         jacobian = self.__jacobian(joint_variables)
+
         joint_velocity = joint_velocity.reshape(-1,1) # assure that it is of size (n*1)
+
         zeta_dot = jacobian * joint_velocity 
         delta = __delta(zeta_dot)
 
