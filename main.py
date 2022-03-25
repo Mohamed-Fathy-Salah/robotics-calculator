@@ -18,6 +18,7 @@ class System:
             self.T.append(self.T[i-1] * self.A[i])
         
         self.jacobian = None
+        self.inverse_jacobian = None
 
     # joint_variables: dictionary of (str, float)
     # str: ti -> t1 | t2 | ...| tn ==>> theta variable for revolute joint
