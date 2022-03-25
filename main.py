@@ -5,7 +5,7 @@ from sympy import *
 class System:
     # DH_matrix  : list of DH objects
     # A          : list of matrices contains A1, A2, ..., An
-    # T          : list of matrices contains T01, T02, ...,T0n
+    # T          : list of matrices contains T01, T02, ..., T0n
     # joint_type : list of Joint object
     def __init__(self, DH_list):
         self.joint_type = [i.joint_type for i in DH_list]
@@ -14,40 +14,43 @@ class System:
 
         self.T = list()
         self.T.append(self.A[0])
-        for i in range(1,len(DH_list)):
+        for i in range(1, len(DH_list)):
             self.T.append(self.T[i-1] * self.A[i])
 
     # TODO : add other constants also ( add it from the begining in DH)
-    # joint_variables: dictionary of (str ,float)
+    # joint_variables: dictionary of (str, float)
     # str: ti -> t1 | t2 | ...| tn ==>> theta variable for revolute joint
     # str: ai -> a1 | a2 | ...| an ==>> alpha variable for prismatic joint
-    def forward_kinamatics(self,joint_variables):
+    def forward_kinamatics(self, joint_variables):
         # compensate in T0n with joint_variables & return x, y, z, phi, theta, psi
         tmp = self.T[-1].subs(joint_variables)
-        x = tmp[0,3]
-        y = tmp[1,3]
-        z = tmp[2,3]
-        phi = atan2(tmp[1,0], tmp[0,0])* 180/ pi
-        psi = atan2(tmp[2,1], tmp[2,2])* 180/ pi
-        theta = atan2(-tmp[2,0] * sin(phi), tmp[1,0])
+        x = tmp[0, 3]
+        y = tmp[1, 3]
+        z = tmp[2, 3]
+        phi = atan2(tmp[1, 0], tmp[0, 0])* 180/ pi
+        psi = atan2(tmp[2, 1], tmp[2, 2])* 180/ pi
+        theta = atan2(-tmp[2, 0] * sin(phi), tmp[1, 0])
         return [x, y, z, phi, theta, psi]
 
     # TODO: fix it does not get all acceptable outputs maybe use another function
-    # TODO: get the last 3 equations
-    def inverse_kinamatics(self,end_effector):
+    # end_effector: [x, y, z, phi, theta, psi]
+    def inverse_kinamatics(self, end_effector):
         return solve([
-            Eq(end_effector[0], self.T[-1][0,3]),
-            Eq(end_effector[1], self.T[-1][1,3]),
-            Eq(end_effector[2], self.T[-1][2,3])
+            Eq(end_effector[0], self.T[-1][0, 3]),
+            Eq(end_effector[1], self.T[-1][1, 3]),
+            Eq(end_effector[2], self.T[-1][2, 3]),
+            # Eq(end_effector[3], atan2(self.T[-1][1, 0],self.T[-1][0, 0])),
+            # Eq(end_effector[4], asin(-self.T[-1][3, 0])),
+            # Eq(end_effector[5], atan2(self.T[-1][2, 1],self.T[-1][2, 2]))
             ])
 
-    # def jacob(self,joint_variables):
+    # def jacob(self, joint_variables):
     #     return self.__jacobian(joint_variables)
 
-    def __jacobian(self,joint_variables):
-        jacobian = np.zeros((6,len(self.joint_type)))
+    def __jacobian(self, joint_variables):
+        jacobian = np.zeros((6, len(self.joint_type)))
         T_n = self.T[-1].subs(joint_variables)
-        O_n = [T_n[0,3], T_n[1,3], T_n[2,3]]
+        O_n = [T_n[0, 3], T_n[1, 3], T_n[2, 3]]
 
         if self.joint_type[0] == Joint.PRISMATIC:
             # JV_0 = z_0 , JW_0 = 0
@@ -59,11 +62,11 @@ class System:
             # JW_0 = z_0
             jacobian[5][0] = 1 # z0 = [0, 0, 1]
 
-        for i in range(1,len(self.joint_type)):
+        for i in range(1, len(self.joint_type)):
             # z_i-1
             tmp = self.T[i-1].subs(joint_variables)
-            z_last = [tmp[0,2], tmp[1,2], tmp[2,2]]
-            O_last = [tmp[0,3], tmp[1,3], tmp[2,3]]
+            z_last = [tmp[0, 2], tmp[1, 2], tmp[2, 2]]
+            O_last = [tmp[0, 3], tmp[1, 3], tmp[2, 3]]
 
             if self.joint_type[i] == Joint.PRISMATIC:
                 # JV_i = z_i-1 , JW_i = 0
@@ -78,19 +81,19 @@ class System:
         return jacobian
     
     # zeta_dot: list of shape(6*1)
-    def __delta(self,zeta_dot):
+    def __delta(self, zeta_dot):
         return np.array([
             [0, float(-zeta_dot[5]), float(zeta_dot[4]), float(zeta_dot[0])],
             [float(zeta_dot[5]), 0, float(-zeta_dot[3]), float(zeta_dot[1])],
             [float(-zeta_dot[4]), float(zeta_dot[3]), 0, float(zeta_dot[2])],
-            [0,0,0,0] ])
+            [0, 0, 0, 0] ])
 
-    # joint_variables: dictionary of (str ,float)
+    # joint_variables: dictionary of (str, float)
     # joint_velocity : list of shape (n*1)
-    def move(self,joint_variables,joint_velocity):
+    def move(self, joint_variables, joint_velocity):
         jacobian = self.__jacobian(joint_variables)
 
-        joint_velocity = np.array(joint_velocity).reshape(-1,1) # assure that it is of size (n*1)
+        joint_velocity = np.array(joint_velocity).reshape(-1, 1) # assure that it is of size (n*1)
 
         zeta_dot = np.matmul(jacobian , joint_velocity)
         delta = self.__delta(zeta_dot)
@@ -141,13 +144,13 @@ if __name__ == '__main__':
         # d = float(input("d{} :".format(i+1)))
         # if(joint_type == Joint.PRISMATIC.value):
             # theta = float(input("theta{} :".format(i+1)))
-        # DH_list.append(DH(a,alpha,d,theta,joint_type,i))
+        # DH_list.append(DH(a, alpha, d, theta, joint_type, i))
     
     # enter 1:FK(q), 2:IK(p), 3:jacobian(), 4:trajectory()
     # system = System(DH_list)
-    system = System([DH(0,0,.3,0,Joint.REVOLUTE,1),DH(0,-pi/2,0,0,Joint.PRISMATIC,2),DH(0,0,0,0,Joint.PRISMATIC,3)])
+    system = System([DH(0, 0, 1, 0, Joint.REVOLUTE, 1),DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2), DH(0, 0, 0, 0, Joint.PRISMATIC, 3)])
     # print(system.forward_kinamatics({'t1':pi/2, 'd2':.1, 'd3':.1})) 
-    # print(system.inverse_kinamatics(end_effector=[1,-1.2,2]))
+    print(system.inverse_kinamatics(end_effector=[1, -1.2, 2, 0, 0, 0]))
     # print(system.jacob({'t1':pi/2, 'd2':.5, 'd3':.5}))
-    print(system.move({'t1':pi/2, 'd2':.5, 'd3':.5}, [pi/36, .01, .01]))
+    # print(system.move({'t1':pi/2, 'd2':.5, 'd3':.5}, [pi/36, .01, .01]))
     
