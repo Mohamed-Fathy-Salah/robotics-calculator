@@ -16,8 +16,9 @@ class System:
         self.T.append(self.A[0])
         for i in range(1, len(DH_list)):
             self.T.append(self.T[i-1] * self.A[i])
+        
+        self.jacobian = None
 
-    # TODO : add other constants also ( add it from the begining in DH)
     # joint_variables: dictionary of (str, float)
     # str: ti -> t1 | t2 | ...| tn ==>> theta variable for revolute joint
     # str: ai -> a1 | a2 | ...| an ==>> alpha variable for prismatic joint
@@ -34,33 +35,44 @@ class System:
 
     # TODO: fix it does not get all acceptable outputs maybe use another function
     # end_effector: [x, y, z, phi, theta, psi]
-    def inverse_kinamatics(self, end_effector):
+    def inverse_kinamatics(self, end_effector): 
+        if len(end_effector) == 3:
+            return solve([
+                Eq(end_effector[0], self.T[-1][0, 3]),
+                Eq(end_effector[1], self.T[-1][1, 3]),
+                Eq(end_effector[2], self.T[-1][2, 3])
+                ])
+
         return solve([
             Eq(end_effector[0], self.T[-1][0, 3]),
             Eq(end_effector[1], self.T[-1][1, 3]),
             Eq(end_effector[2], self.T[-1][2, 3]),
-            # Eq(end_effector[3], atan2(self.T[-1][1, 0],self.T[-1][0, 0])),
-            # Eq(end_effector[4], asin(-self.T[-1][3, 0])),
-            # Eq(end_effector[5], atan2(self.T[-1][2, 1],self.T[-1][2, 2]))
+            Eq(tan(end_effector[3]), self.T[-1][1, 0]/self.T[-1][0, 0]),
+            Eq(sin(end_effector[4]), -self.T[-1][3, 0]),
+            Eq(tan(end_effector[5]), self.T[-1][2, 1]/self.T[-1][2, 2])
             ])
 
     # def jacob(self, joint_variables):
     #     return self.__jacobian(joint_variables)
 
+    # TODO: make jacobian only once during the life time of the program
     def __jacobian(self, joint_variables):
-        jacobian = np.zeros((6, len(self.joint_type)))
+        if self.jacobian != None:
+            return 
+
+        self.jacobian = np.zeros((6, len(self.joint_type)))
         T_n = self.T[-1].subs(joint_variables)
         O_n = [T_n[0, 3], T_n[1, 3], T_n[2, 3]]
 
         if self.joint_type[0] == Joint.PRISMATIC:
             # JV_0 = z_0 , JW_0 = 0
-            jacobian[2][0] = 1 # z0 = [0, 0, 1]
+            self.jacobian[2][0] = 1 # z0 = [0, 0, 1]
         else:
             # JV_0 = z_0 * O_n
-            jacobian [0:3, 0] = np.cross(np.array([0, 0, 1]), np.array(O_n))
+            self.jacobian [0:3, 0] = np.cross(np.array([0, 0, 1]), np.array(O_n))
 
             # JW_0 = z_0
-            jacobian[5][0] = 1 # z0 = [0, 0, 1]
+            self.jacobian[5][0] = 1 # z0 = [0, 0, 1]
 
         for i in range(1, len(self.joint_type)):
             # z_i-1
@@ -70,15 +82,13 @@ class System:
 
             if self.joint_type[i] == Joint.PRISMATIC:
                 # JV_i = z_i-1 , JW_i = 0
-                jacobian[0:3, i] = z_last
+                self.jacobian[0:3, i] = z_last
             else:
                 # JV_i = z_i-1 * (O_n - O_i-1)
-                jacobian [0:3, i] = np.cross(np.array(z_last), np.array(O_n - O_last))
+                self.jacobian [0:3, i] = np.cross(np.array(z_last), np.array(O_n - O_last))
 
                 # JW_i = z_i-1
-                jacobian[3:6, i] = z_last
-
-        return jacobian
+                self.jacobian[3:6, i] = z_last
     
     # zeta_dot: list of shape(6*1)
     def __delta(self, zeta_dot):
@@ -91,7 +101,7 @@ class System:
     # joint_variables: dictionary of (str, float)
     # joint_velocity : list of shape (n*1)
     def move(self, joint_variables, joint_velocity):
-        jacobian = self.__jacobian(joint_variables)
+        self.__jacobian(joint_variables)
 
         joint_velocity = np.array(joint_velocity).reshape(-1, 1) # assure that it is of size (n*1)
 
@@ -150,7 +160,7 @@ if __name__ == '__main__':
     # system = System(DH_list)
     system = System([DH(0, 0, 1, 0, Joint.REVOLUTE, 1),DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2), DH(0, 0, 0, 0, Joint.PRISMATIC, 3)])
     # print(system.forward_kinamatics({'t1':pi/2, 'd2':.1, 'd3':.1})) 
-    print(system.inverse_kinamatics(end_effector=[1, -1.2, 2, 0, 0, 0]))
+    print(system.inverse_kinamatics([1, -1.2, 2]))
     # print(system.jacob({'t1':pi/2, 'd2':.5, 'd3':.5}))
     # print(system.move({'t1':pi/2, 'd2':.5, 'd3':.5}, [pi/36, .01, .01]))
     
