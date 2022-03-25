@@ -22,7 +22,7 @@ class System:
 
     # joint_variables: dictionary of (str, float)
     # str: ti -> t1 | t2 | ...| tn ==>> theta variable for revolute joint
-    # str: ai -> a1 | a2 | ...| an ==>> alpha variable for prismatic joint
+    # str: di -> d1 | d2 | ...| dn ==>> d variable for prismatic joint
     def forward_kinamatics(self, joint_variables):
         # compensate in T0n with joint_variables & return x, y, z, phi, theta, psi
         tmp = self.T[-1].subs(joint_variables)
@@ -123,9 +123,39 @@ class System:
         t_new = np.add(t_old , np.dot(delta , t_old))
         return t_new
 
-    def trajectory(self):
-        pass
+    # end_effector_position: Matrix(x(t), y(t), z(t))
+    # time: [t0, t1, ..., tn]
+    def trajectory(self, end_effector_position, time):
+        self.__inverse_jacobian()
 
+        end_effector_velocity = diff(end_effector_position)
+
+        end_effector_position_0 = np.array(end_effector_position.subs(time[0]).tolist()).astype(np.float64)
+        joint_position_0 = self.inverse_kinamatics(end_effector_position_0)
+        
+        end_effector_velocity_0 = np.array(end_effector_velocity.subs(time[0]).tolist()).astype(np.float64)
+        # TODO: multiply by zeta
+        joint_velocity_0 = self.inverse_jacobian.subs(joint_position_0) * 
+
+        for i in range(1, len(time)): 
+            end_effector_position_f = np.array(end_effector_position.subs(time[i]).tolist()).astype(np.float64)
+            joint_position_f = self.inverse_kinamatics(end_effector_position_0)
+
+            end_effector_velocity_f = np.array(end_effector_velocity.subs(time[0]).tolist()).astype(np.float64)
+            # TODO: multiply by zeta
+            joint_velocity_f = self.inverse_jacobian.subs(joint_position_0) * 
+            
+            a0, a1, a2, a3, a4 = symbols('a0 a1 a2 a3 a4')
+            # TODO: split it for all joint variables
+            tmp = solve([
+                Eq(a0 + a1*time[i-1] + a2*time[i-1]**2 + a3*time[i-1]**3 + a4*time[i-1]**4, joint_position_0),
+                Eq(a1 + 2*a2*time[i-1] + 3*a3*time[i-1]**2 + 4*a4*time[i-1]**3, joint_velocity_0),
+                Eq(a0 + a1*time[i] + a2*time[i]**2 + a3*time[i]**3 + a4*time[i]**4, joint_position_f),
+                Eq(a1 + 2*a2*time[i] + 3*a3*time[i]**2 + 4*a4*time[i]**3, joint_velocity_f)
+                ])
+
+            # TODO: plot equations 
+            
 class DH:
     # a, alpha, d, theta: float
     # joint_type: Joint
