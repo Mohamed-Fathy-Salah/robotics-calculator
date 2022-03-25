@@ -53,44 +53,53 @@ class System:
             Eq(tan(end_effector[5]), self.T[-1][2, 1]/self.T[-1][2, 2])
             ])
 
-    # def jacob(self, joint_variables):
-    #     return self.__jacobian(joint_variables)
-
-    # TODO: make jacobian only once during the life time of the program
-    def __jacobian(self, joint_variables):
+    # def jacob(self):
+    #     self.__jacobian()
+    #     return self.jacobian
+    
+    def __jacobian(self):
         if self.jacobian != None:
             return 
 
-        self.jacobian = np.zeros((6, len(self.joint_type)))
-        T_n = self.T[-1].subs(joint_variables)
-        O_n = [T_n[0, 3], T_n[1, 3], T_n[2, 3]]
+        self.jacobian = zeros(6,len(self.joint_type))
+
+        O_n = self.T[-1][0:3, 3]
 
         if self.joint_type[0] == Joint.PRISMATIC:
             # JV_0 = z_0 , JW_0 = 0
-            self.jacobian[2][0] = 1 # z0 = [0, 0, 1]
+            self.jacobian[2, 0] = 1 # z0 = [0, 0, 1]
         else:
             # JV_0 = z_0 * O_n
-            self.jacobian [0:3, 0] = np.cross(np.array([0, 0, 1]), np.array(O_n))
+            self.jacobian[0:3, 0] = Matrix([0, 0, 1]).cross(O_n)
 
             # JW_0 = z_0
-            self.jacobian[5][0] = 1 # z0 = [0, 0, 1]
+            self.jacobian[5, 0] = 1 # z0 = [0, 0, 1]
 
         for i in range(1, len(self.joint_type)):
             # z_i-1
-            tmp = self.T[i-1].subs(joint_variables)
-            z_last = [tmp[0, 2], tmp[1, 2], tmp[2, 2]]
-            O_last = [tmp[0, 3], tmp[1, 3], tmp[2, 3]]
+            z_last = self.T[i-1][0:3, 2]
+            # O_i-1
+            O_last = self.T[i-1][0:3, 3]
 
             if self.joint_type[i] == Joint.PRISMATIC:
                 # JV_i = z_i-1 , JW_i = 0
                 self.jacobian[0:3, i] = z_last
             else:
                 # JV_i = z_i-1 * (O_n - O_i-1)
-                self.jacobian [0:3, i] = np.cross(np.array(z_last), np.array(O_n - O_last))
+                self.jacobian [0:3, i] = z_last.cross(O_n - O_last)
 
                 # JW_i = z_i-1
                 self.jacobian[3:6, i] = z_last
+
+    # def inv_jacob(self):
+    #     self.__inverse_jacobian()
+    #     return self.inverse_jacobian
     
+    def __inverse_jacobian(self):
+        if self.inverse_jacobian != None:
+            return
+        self.inverse_jacobian = (self.jacobian.T * self.jacobian) ** -1 * self.jacobian.T
+        
     # zeta_dot: list of shape(6*1)
     def __delta(self, zeta_dot):
         return np.array([
@@ -102,11 +111,12 @@ class System:
     # joint_variables: dictionary of (str, float)
     # joint_velocity : list of shape (n*1)
     def move(self, joint_variables, joint_velocity):
-        self.__jacobian(joint_variables)
+        self.__jacobian()
+        J = np.array(self.jacobian.subs(joint_variables).tolist()).astype(np.float64)
 
         joint_velocity = np.array(joint_velocity).reshape(-1, 1) # assure that it is of size (n*1)
 
-        zeta_dot = np.matmul(jacobian , joint_velocity)
+        zeta_dot = np.matmul(J , joint_velocity)
         delta = self.__delta(zeta_dot)
 
         t_old = self.T[-1].subs(joint_variables)
@@ -159,9 +169,11 @@ if __name__ == '__main__':
     
     # enter 1:FK(q), 2:IK(p), 3:jacobian(), 4:trajectory()
     # system = System(DH_list)
-    system = System([DH(0, 0, 1, 0, Joint.REVOLUTE, 1),DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2), DH(0, 0, 0, 0, Joint.PRISMATIC, 3)])
+    # system = System([DH(0, 0, 1, 0, Joint.REVOLUTE, 1),DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2), DH(0, 0, 0, 0, Joint.PRISMATIC, 3)])
+    system = System([DH(0, 0, 1, 0, Joint.REVOLUTE, 1),DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2), DH(0, 0, 1, 0, Joint.PRISMATIC, 3)])
     # print(system.forward_kinamatics({'t1':pi/2, 'd2':.1, 'd3':.1})) 
-    print(system.inverse_kinamatics([1, -1.2, 2]))
-    # print(system.jacob({'t1':pi/2, 'd2':.5, 'd3':.5}))
+    # print(system.inverse_kinamatics([1, -1.2, 2]))
+    # print(system.jacob())
+    # print(system.inv_jacob())
     # print(system.move({'t1':pi/2, 'd2':.5, 'd3':.5}, [pi/36, .01, .01]))
     
