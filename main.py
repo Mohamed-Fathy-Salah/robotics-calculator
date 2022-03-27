@@ -31,27 +31,32 @@ class System:
         z = tmp[2, 3]
         phi = atan2(tmp[1, 0], tmp[0, 0])* 180/ pi
         psi = atan2(tmp[2, 1], tmp[2, 2])* 180/ pi
-        theta = atan2(-tmp[2, 0] * sin(phi), tmp[1, 0])
+        theta = atan2(-tmp[2,0], sqrt(1-tmp[2,0]**2))
+        # print(np.array(self.T[-1].tolist()))
         return [x, y, z, phi, theta, psi]
 
-    # TODO: fix it does not get all acceptable outputs maybe use another function
-    # end_effector: [x, y, z, phi, theta, psi]
-    def inverse_kinamatics(self, end_effector): 
-        if len(end_effector) == 3:
-            return solve([
-                Eq(end_effector[0], self.T[-1][0, 3]),
-                Eq(end_effector[1], self.T[-1][1, 3]),
-                Eq(end_effector[2], self.T[-1][2, 3])
-                ])
+    def inverse_kinamatics(self, x=0, y=0, z=0, phi=None, theta=None, psi=None):
+        all_equations = [
+                self.T[-1][0, 3] - x,
+                self.T[-1][1, 3] - y,
+                self.T[-1][2, 3] - z,
+                ]
 
-        return solve([
-            Eq(end_effector[0], self.T[-1][0, 3]),
-            Eq(end_effector[1], self.T[-1][1, 3]),
-            Eq(end_effector[2], self.T[-1][2, 3]),
-            Eq(tan(end_effector[3]), self.T[-1][1, 0]/self.T[-1][0, 0]),
-            Eq(sin(end_effector[4]), -self.T[-1][3, 0]),
-            Eq(tan(end_effector[5]), self.T[-1][2, 1]/self.T[-1][2, 2])
-            ])
+        if phi != None: 
+            all_equations = all_equations + [
+                    atan(self.T[-1][1, 0] / self.T[-1][0, 0]) - phi,
+                    atan(-self.T[-1][2, 0] / sqrt(1 - self.T[-1][2, 0]**2)) - theta,
+                    atan(self.T[-1][2, 1] / self.T[-1][2, 2]) - psi
+                    ]
+
+        # remove non symbolic equations 
+        equations = list()
+        for equation in all_equations:
+            if type(equation) != float and equation !=0 and type(equation) != calculus.accumulationbounds.AccumulationBounds: 
+                equations.append(equation)
+
+        return solve(equations)
+
 
     # def jacob(self):
     #     self.__jacobian()
@@ -98,6 +103,7 @@ class System:
     def __inverse_jacobian(self):
         if self.inverse_jacobian != None:
             return
+        self.__jacobian() # make sure that it is present
         self.inverse_jacobian = (self.jacobian.T * self.jacobian) ** -1 * self.jacobian.T
         
     # zeta_dot: list of shape(6*1)
@@ -135,7 +141,7 @@ class System:
         
         end_effector_velocity_0 = np.array(end_effector_velocity.subs(time[0]).tolist()).astype(np.float64)
         # TODO: multiply by zeta
-        joint_velocity_0 = self.inverse_jacobian.subs(joint_position_0) * 
+        joint_velocity_0 = self.inverse_jacobian.subs(joint_position_0) * Matrix(6, 1, [])
 
         for i in range(1, len(time)): 
             end_effector_position_f = np.array(end_effector_position.subs(time[i]).tolist()).astype(np.float64)
@@ -143,9 +149,16 @@ class System:
 
             end_effector_velocity_f = np.array(end_effector_velocity.subs(time[0]).tolist()).astype(np.float64)
             # TODO: multiply by zeta
-            joint_velocity_f = self.inverse_jacobian.subs(joint_position_0) * 
+            joint_velocity_f = self.inverse_jacobian.subs(joint_position_f) * Matrix(6, 1, [])
             
             a0, a1, a2, a3, a4 = symbols('a0 a1 a2 a3 a4')
+
+            for i in range(len(self.joint_type)):
+                if self.joint_type[i] == Joint.PRISMATIC: 
+                    pass
+                else:
+                    pass
+
             # TODO: split it for all joint variables
             tmp = solve([
                 Eq(a0 + a1*time[i-1] + a2*time[i-1]**2 + a3*time[i-1]**3 + a4*time[i-1]**4, joint_position_0),
@@ -200,10 +213,23 @@ if __name__ == '__main__':
     # enter 1:FK(q), 2:IK(p), 3:jacobian(), 4:trajectory()
     # system = System(DH_list)
     # system = System([DH(0, 0, 1, 0, Joint.REVOLUTE, 1),DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2), DH(0, 0, 0, 0, Joint.PRISMATIC, 3)])
-    system = System([DH(0, 0, 1, 0, Joint.REVOLUTE, 1),DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2), DH(0, 0, 1, 0, Joint.PRISMATIC, 3)])
-    # print(system.forward_kinamatics({'t1':pi/2, 'd2':.1, 'd3':.1})) 
-    # print(system.inverse_kinamatics([1, -1.2, 2]))
+    system = System([
+        DH(0, 0, 1, 0, Joint.REVOLUTE, 1),
+        DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2),
+        DH(0, 0, 0, 0, Joint.PRISMATIC, 3)
+        ])
+    # system = System([
+        # DH(0, -pi/2, 0, 0,Joint.REVOLUTE,1),
+        # DH(0, pi/2, 2, 0,Joint.REVOLUTE,2),
+        # DH(0, 0, 0, 0,Joint.PRISMATIC,3),
+        # DH(0, -pi/2, 0, 0,Joint.REVOLUTE,4),
+        # DH(0, pi/2, 0, 0,Joint.REVOLUTE,5),
+        # DH(0, 0, 6, 0,Joint.REVOLUTE,6),
+        # ])
+    # print(system.forward_kinamatics({'t1':pi/2, 't2':pi/2, 'd3':3, 't4':pi/2, 't5':pi/2, 't6':pi/2})) 
+    # print(system.inverse_kinamatics([1, -1.2, 2, 0.694738276196703, 0, 1.570796]))
+    print(system.inverse_kinamatics(x=1, y=-1.2, z=2, phi=0.694738276196703, theta=0, psi=1.570796))
     # print(system.jacob())
     # print(system.inv_jacob())
     # print(system.move({'t1':pi/2, 'd2':.5, 'd3':.5}, [pi/36, .01, .01]))
-    
+
