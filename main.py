@@ -55,7 +55,7 @@ class System:
             if type(equation) != float and equation !=0 and type(equation) != calculus.accumulationbounds.AccumulationBounds: 
                 equations.append(equation)
 
-        return solve(equations)
+        return solve(equations, dict=True)
 
 
     # def jacob(self):
@@ -131,7 +131,6 @@ class System:
 
     def cubic_coeffetions(self, t0, tf, q_t0, dq_t0, q_tf, dq_tf):
         a0, a1, a2, a3 = symbols('a0 a1 a2 a3')
-
         solution = solve([
             Eq(q_t0, a0 + a1*t0 + a2*t0**2 + a3*t0**3),
             Eq(q_tf, a0 + a1*tf + a2*tf**2 + a3*tf**3),
@@ -139,6 +138,7 @@ class System:
             Eq(dq_tf, a1 + 2*a2*tf + 3*a3*tf**2)
             ])
         # TODO: plot position, velocity as function of time 
+        return solution
 
     def quintic_coeffetions(self, t0, tf, q_t0, dq_t0, ddq_t0, q_tf, dq_tf, ddq_tf):
         a0, a1, a2, a3, a4, a5 = symbols('a0 a1 a2 a3 a4 a5')
@@ -151,6 +151,7 @@ class System:
             Eq(ddq_tf, 2*a2 + 6*a3*tf + 12*a4*tf**2 + 20*a5*tf**3)
             ])
         # TODO: plot position, velocity, acceleration as function of time
+        return solution
 
     # end_effector_position: Matrix(x(t), y(t), z(t))
     # time: [t0, t1, ..., tn]
@@ -159,39 +160,41 @@ class System:
 
         end_effector_velocity = diff(end_effector_position)
 
-        end_effector_position_0 = np.array(end_effector_position.subs(time[0]).tolist()).astype(np.float64)
-        joint_position_0 = self.inverse_kinamatics(end_effector_position_0)
+        # x(t0), y(t0), z(t0)
+        end_effector_position_0 = np.array(end_effector_position.subs({'t': time[0]}).tolist()).astype(np.float64).reshape(-1,) 
+        # q(t0) : dictionary 
+        joint_position_0 = self.inverse_kinamatics(end_effector_position_0[0], end_effector_position_0[1], end_effector_position_0[2])
         
-        end_effector_velocity_0 = np.array(end_effector_velocity.subs(time[0]).tolist()).astype(np.float64)
-        # TODO: multiply by zeta
-        joint_velocity_0 = self.inverse_jacobian.subs(joint_position_0) * Matrix(6, 1, [])
+        # dx(t0), dy(t0), dz(t0)
+        end_effector_velocity_0 = np.array(end_effector_velocity.subs({'t': time[0]}).tolist()).astype(np.float64).reshape(1,-1)
+        # dq(t0) : n*1 array
+        joint_velocity_0 = self.inverse_jacobian.subs(joint_position_0[0]) * Matrix(6, 1, np.append(end_effector_velocity_0, [0, 0, 0]))
 
-        for i in range(1, len(time)): 
-            end_effector_position_f = np.array(end_effector_position.subs(time[i]).tolist()).astype(np.float64)
-            joint_position_f = self.inverse_kinamatics(end_effector_position_0)
+        for t in range(1, len(time)): 
+            # x(tf), y(tf), z(tf)
+            end_effector_position_f = np.array(end_effector_position.subs({'t': time[t]}).tolist()).astype(np.float64).reshape(-1,) 
+            # q(tf) : dictionary
+            joint_position_f = self.inverse_kinamatics(end_effector_position_f[0], end_effector_position_f[1], end_effector_position_f[2])
 
-            end_effector_velocity_f = np.array(end_effector_velocity.subs(time[0]).tolist()).astype(np.float64)
-            # TODO: multiply by zeta
-            joint_velocity_f = self.inverse_jacobian.subs(joint_position_f) * Matrix(6, 1, [])
+            # dx(tf), dy(tf), dz(tf)
+            end_effector_velocity_f = np.array(end_effector_velocity.subs({'t': time[t]}).tolist()).astype(np.float64).reshape(1,-1)
+            # dq(tf) : n*1 array
+            joint_velocity_f = self.inverse_jacobian.subs(joint_position_f[0]) * Matrix(6, 1, np.append(end_effector_velocity_f, [0, 0, 0]))
             
-            a0, a1, a2, a3, a4 = symbols('a0 a1 a2 a3 a4')
+            # a0, a1, a2, a3, a4 = symbols('a0 a1 a2 a3 a4')
 
-            for i in range(len(self.joint_type)):
-                if self.joint_type[i] == Joint.PRISMATIC: 
-                    pass
+            for j in range(len(self.joint_type)):
+                q = None
+                if self.joint_type[j] == Joint.PRISMATIC: 
+                    q = Symbol('d{}'.format(j+1))
                 else:
-                    pass
+                    q = Symbol('t{}'.format(j+1))
+                
+                # solution = [a0, a1, a2, a3]
+                solution = self.cubic_coeffetions(time[t-1], time[t], joint_position_0[0][q], joint_velocity_0[j], joint_position_f[0][q], joint_velocity_f[j])
+                print(t, j, solution)
+                # TODO: subplot solution (pos, vel, acc)
 
-            # TODO: split it for all joint variables
-            tmp = solve([
-                Eq(a0 + a1*time[i-1] + a2*time[i-1]**2 + a3*time[i-1]**3 + a4*time[i-1]**4, joint_position_0),
-                Eq(a1 + 2*a2*time[i-1] + 3*a3*time[i-1]**2 + 4*a4*time[i-1]**3, joint_velocity_0),
-                Eq(a0 + a1*time[i] + a2*time[i]**2 + a3*time[i]**3 + a4*time[i]**4, joint_position_f),
-                Eq(a1 + 2*a2*time[i] + 3*a3*time[i]**2 + 4*a4*time[i]**3, joint_velocity_f)
-                ])
-
-            # TODO: plot equations 
-            
 class DH:
     # a, alpha, d, theta: float
     # joint_type: Joint
@@ -236,11 +239,11 @@ if __name__ == '__main__':
     # enter 1:FK(q), 2:IK(p), 3:jacobian(), 4:trajectory()
     # system = System(DH_list)
     # system = System([DH(0, 0, 1, 0, Joint.REVOLUTE, 1),DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2), DH(0, 0, 0, 0, Joint.PRISMATIC, 3)])
-    system = System([
-        DH(0, 0, 1, 0, Joint.REVOLUTE, 1),
-        DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2),
-        DH(0, 0, 0, 0, Joint.PRISMATIC, 3)
-        ])
+    # system = System([
+        # DH(0, 0, 1, 0, Joint.REVOLUTE, 1),
+        # DH(0, -pi/2, 0, 0, Joint.PRISMATIC, 2),
+        # DH(0, 0, 0, 0, Joint.PRISMATIC, 3)
+        # ])
     # system = System([
         # DH(0, -pi/2, 0, 0,Joint.REVOLUTE,1),
         # DH(0, pi/2, 2, 0,Joint.REVOLUTE,2),
@@ -249,10 +252,10 @@ if __name__ == '__main__':
         # DH(0, pi/2, 0, 0,Joint.REVOLUTE,5),
         # DH(0, 0, 6, 0,Joint.REVOLUTE,6),
         # ])
-    # system = System([
-        # DH(2,0,0,.529,Joint.REVOLUTE,1),
-        # DH(2,0,0,.776,Joint.REVOLUTE,2),
-        # ])
+    system = System([
+        DH(2,0,0,0,Joint.REVOLUTE,1),
+        DH(2,0,0,0,Joint.REVOLUTE,2),
+        ])
     # print(system.forward_kinamatics({'t1':pi/2, 't2':pi/2, 'd3':3, 't4':pi/2, 't5':pi/2, 't6':pi/2})) 
     # print(system.inverse_kinamatics([1, -1.2, 2, 0.694738276196703, 0, 1.570796]))
     # print(system.inverse_kinamatics(x=1, y=-1.2, z=2, phi=0.694738276196703, theta=0, psi=1.570796))
@@ -262,5 +265,6 @@ if __name__ == '__main__':
     # print(system.inv_jacob())
     # print(system.move({'t1':pi/2, 'd2':.5, 'd3':.5}, [pi/36, .01, .01]))
     # print(system.cubic_coeffetions(0, 1, 10, 0, -20, 0))
-    print(system.quintic_coeffetions(0, 2, 0, 0, 0, 40, 0, 0))
-
+    # print(system.quintic_coeffetions(0, 2, 0, 0, 0, 40, 0, 0))
+    t = Symbol('t')
+    system.trajectory(Matrix([2+.5*cos(t), 1+.5*sin(t), 0]), [0, pi/8, pi/4])
