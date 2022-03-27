@@ -29,8 +29,8 @@ class System:
         x = tmp[0, 3]
         y = tmp[1, 3]
         z = tmp[2, 3]
-        phi = atan2(tmp[1, 0], tmp[0, 0])* 180/ pi
-        psi = atan2(tmp[2, 1], tmp[2, 2])* 180/ pi
+        phi = atan2(tmp[1, 0], tmp[0, 0])
+        psi = atan2(tmp[2, 1], tmp[2, 2])
         theta = atan2(-tmp[2,0], sqrt(1-tmp[2,0]**2))
         # print(np.array(self.T[-1].tolist()))
         return [x, y, z, phi, theta, psi]
@@ -129,6 +129,29 @@ class System:
         t_new = np.add(t_old , np.dot(delta , t_old))
         return t_new
 
+    def cubic_coeffetions(self, t0, tf, q_t0, dq_t0, q_tf, dq_tf):
+        a0, a1, a2, a3 = symbols('a0 a1 a2 a3')
+
+        solution = solve([
+            Eq(q_t0, a0 + a1*t0 + a2*t0**2 + a3*t0**3),
+            Eq(q_tf, a0 + a1*tf + a2*tf**2 + a3*tf**3),
+            Eq(dq_t0, a1 + 2*a2*t0 + 3*a3*t0**2),
+            Eq(dq_tf, a1 + 2*a2*tf + 3*a3*tf**2)
+            ])
+        # TODO: plot position, velocity as function of time 
+
+    def quintic_coeffetions(self, t0, tf, q_t0, dq_t0, ddq_t0, q_tf, dq_tf, ddq_tf):
+        a0, a1, a2, a3, a4, a5 = symbols('a0 a1 a2 a3 a4 a5')
+        solution = solve([
+            Eq(q_t0, a0 + a1*t0 + a2*t0**2 + a3*t0**3 + a4*t0**4 + a5*t0**5),
+            Eq(q_tf, a0 + a1*tf + a2*tf**2 + a3*tf**3 + a4*tf**4 + a5*tf**5),
+            Eq(dq_t0, a1 + 2*a2*t0 + 3*a3*t0**2 + 4*a4*t0**3 + 5*a5*t0**4),
+            Eq(dq_tf, a1 + 2*a2*tf + 3*a3*tf**2 + 4*a4*tf**3 + 5*a5*tf**4),
+            Eq(ddq_t0, 2*a2 + 6*a3*t0 + 12*a4*t0**2 + 20*a5*t0**3),
+            Eq(ddq_tf, 2*a2 + 6*a3*tf + 12*a4*tf**2 + 20*a5*tf**3)
+            ])
+        # TODO: plot position, velocity, acceleration as function of time
+
     # end_effector_position: Matrix(x(t), y(t), z(t))
     # time: [t0, t1, ..., tn]
     def trajectory(self, end_effector_position, time):
@@ -226,10 +249,18 @@ if __name__ == '__main__':
         # DH(0, pi/2, 0, 0,Joint.REVOLUTE,5),
         # DH(0, 0, 6, 0,Joint.REVOLUTE,6),
         # ])
+    # system = System([
+        # DH(2,0,0,.529,Joint.REVOLUTE,1),
+        # DH(2,0,0,.776,Joint.REVOLUTE,2),
+        # ])
     # print(system.forward_kinamatics({'t1':pi/2, 't2':pi/2, 'd3':3, 't4':pi/2, 't5':pi/2, 't6':pi/2})) 
     # print(system.inverse_kinamatics([1, -1.2, 2, 0.694738276196703, 0, 1.570796]))
-    print(system.inverse_kinamatics(x=1, y=-1.2, z=2, phi=0.694738276196703, theta=0, psi=1.570796))
+    # print(system.inverse_kinamatics(x=1, y=-1.2, z=2, phi=0.694738276196703, theta=0, psi=1.570796))
+    # print(system.inverse_kinamatics(x=2.5, y=1)) #(x=2.49999998504874, y=0.999999969193044, z=0, phi=-0.451835740960530, theta=0, psi=0))
+    # print(system.forward_kinamatics({'t1': 1.21284847806357, 't2': -1.6646842190241}))
     # print(system.jacob())
     # print(system.inv_jacob())
     # print(system.move({'t1':pi/2, 'd2':.5, 'd3':.5}, [pi/36, .01, .01]))
+    # print(system.cubic_coeffetions(0, 1, 10, 0, -20, 0))
+    print(system.quintic_coeffetions(0, 2, 0, 0, 0, 40, 0, 0))
 
