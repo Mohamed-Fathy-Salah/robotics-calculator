@@ -2,10 +2,10 @@ from robot import *
 
 sys = Factory(0)
 print("fk")
-sys.fk()
+print(sys.fk())
 print("-------------------")
 print("ik")
-sys.ik()
+print(sys.ik())
 print("-------------------")
 print("jacobian")
 sys.j()
