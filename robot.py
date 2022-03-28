@@ -140,10 +140,18 @@ class System:
             Eq(dq_t0, a1 + 2*a2*t0 + 3*a3*t0**2),
             Eq(dq_tf, a1 + 2*a2*tf + 3*a3*tf**2)
             ], dict=True)[0]
+        position = solution[a0] + solution[a1]*t + solution[a2]*t**2 + solution[a3]*t**3
+        velocity = solution[a1] + 2*solution[a2]*t + 3*solution[a3]*t**2
+        acceleration = 2*solution[a2] + 6*solution[a3]*t
+        init_printing()
+        print("\n-- joint{}".format(joint_number))
+        print("position = {}".format(position))
+        print("velocity = {}".format(velocity))
+        print("acceleration = {}".format(acceleration))
         return [
-                plot(solution[a0] + solution[a1]*t + solution[a2]*t**2 + solution[a3]*t**3, show=False, title="joint{} position".format(joint_number)),
-                plot(solution[a1] + 2*solution[a2]*t + 3*solution[a3]*t**2, show=False, title="joint{} velocity".format(joint_number)),
-                plot(2*solution[a2] + 6*solution[a3]*t, show=False, title="joint{} acceleration".format(joint_number))]
+                plot(position, show=False, title="joint{} position".format(joint_number)),
+                plot(velocity, show=False, title="joint{} velocity".format(joint_number)),
+                plot(acceleration, show=False, title="joint{} acceleration".format(joint_number))]
                 
 
     def quintic_coeffetions(self, t0, tf, q_t0, dq_t0, ddq_t0, q_tf, dq_tf, ddq_tf):
