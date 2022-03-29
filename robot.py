@@ -1,3 +1,6 @@
+"""
+library to process forward kinamatics, inverse kinamatics, jacobian, inverse jacobian, move end effector, cubic coefficients, quintic coefficients and trajectory
+"""
 import numpy as np
 from enum import Enum
 from sympy import *

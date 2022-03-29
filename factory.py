@@ -1,3 +1,14 @@
+"""
+this class outputs robot samples ( for testing )
+use :
+    system = Factory(0)
+    system.fk()
+    system.ik()
+    system.jacob()
+    system.inv_jacob()
+    system.j()
+    system.t()
+"""
 from robot import *
 class Factory:
     def __init__(self, i):
