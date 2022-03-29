@@ -132,7 +132,7 @@ class System:
         print("t_new: \n{}".format(t_new))
         return t_new
 
-    def cubic_coeffetions(self, t0, tf, q_t0, dq_t0, q_tf, dq_tf, joint_number=1):
+    def cubic_coefficients(self, t0, tf, q_t0, dq_t0, q_tf, dq_tf, joint_number=1):
         a0, a1, a2, a3, t = symbols('a0 a1 a2 a3 t')
         solution = solve([
             Eq(q_t0, a0 + a1*t0 + a2*t0**2 + a3*t0**3),
@@ -154,7 +154,7 @@ class System:
                 plot(acceleration, show=False, title="joint{} acceleration".format(joint_number))]
                 
 
-    def quintic_coeffetions(self, t0, tf, q_t0, dq_t0, ddq_t0, q_tf, dq_tf, ddq_tf):
+    def quintic_coefficients(self, t0, tf, q_t0, dq_t0, ddq_t0, q_tf, dq_tf, ddq_tf):
         a0, a1, a2, a3, a4, a5 = symbols('a0 a1 a2 a3 a4 a5')
         solution = solve([
             Eq(q_t0, a0 + a1*t0 + a2*t0**2 + a3*t0**3 + a4*t0**4 + a5*t0**5),
@@ -205,7 +205,7 @@ class System:
                 else:
                     q = Symbol('t{}'.format(j+1))
                 
-                joint_equations = joint_equations + self.cubic_coeffetions(time[t-1], time[t], joint_position_0[q], joint_velocity_0[j], joint_position_f[q], joint_velocity_f[j], j+1)
+                joint_equations = joint_equations + self.cubic_coefficients(time[t-1], time[t], joint_position_0[q], joint_velocity_0[j], joint_position_f[q], joint_velocity_f[j], j+1)
 
                 # print('\n\t>>> joint_{}<<<\n'.format(j+1))
                 # print(time[t-1], time[t], joint_position_0[q] * mul, joint_velocity_0[j], joint_position_f[q] * mul, joint_velocity_f[j])
