@@ -160,7 +160,8 @@ class System:
 
     # a: [a0, a1, a2, a3, a4, a5]
     # limit : [t0 tf]
-    def __get_equations(self, a, limit, joint_number=1):
+    # def __get_equations(self, a, limit, joint_number=1):
+    def __get_equations(self, a, joint_number=1):
         if(len(a) == 4):
             a = a + [0, 0]
 
@@ -174,11 +175,15 @@ class System:
         print("velocity = {}".format(velocity))
         print("acceleration = {}".format(acceleration))
 
-
+        # interval = Interval(*limit)
         return [
-                plot(position, xlim=limit , show=True, title="joint{} position".format(joint_number)),
-                plot(velocity, Xlim=limit, show=False, title="joint{} velocity".format(joint_number)),
-                plot(acceleration, Xlim=limit, show=False, title="joint{} acceleration".format(joint_number))]
+                plot(position, show=False, xlabel="time", ylabel="position", title="joint{}".format(joint_number)),
+                plot(velocity, show=False, xlabel="time", ylabel="velocity", title="joint{}".format(joint_number)),
+                plot(acceleration, show=False, xlabel="time", ylabel="acceleration", title="joint{}".format(joint_number))
+                # plot(position, xlim=limit, ylim=[minimum(position, t, interval)*0.9, maximum(position, t, interval)*1.1], show=False, xlabel="time", ylabel="position", title="joint{}".format(joint_number)),
+                # plot(velocity, xlim=limit, ylim=[minimum(velocity, t, interval)*0.9, maximum(velocity, t, interval)*1.1], show=False, xlabel="time", ylabel="velocity", title="joint{}".format(joint_number)),
+                # plot(acceleration, xlim=limit, ylim=[minimum(acceleration, t, interval)*0.9, maximum(acceleration, t, interval)*1.1], show=False, xlabel="time", ylabel="acceleration", title="joint{}".format(joint_number))
+                ]
 
     # end_effector_position: Matrix(x(t), y(t), z(t))
     # time: [t0, t1, ..., tn]
@@ -219,9 +224,9 @@ class System:
                 else:
                     q = Symbol('t{}'.format(j+1))
                 
-                # joint_equations = joint_equations + self.cubic_coefficients(time[t-1], time[t], joint_position_0[q], joint_velocity_0[j], joint_position_f[q], joint_velocity_f[j], j+1)
                 a = self.cubic_coefficients(time[t-1], time[t], joint_position_0[q], joint_velocity_0[j], joint_position_f[q], joint_velocity_f[j])
-                joint_equations = joint_equations + self.__get_equations(a, time[t-1:t+1], j+1)
+                # joint_equations = joint_equations + self.__get_equations(a, time[t-1:t+1], j+1)
+                joint_equations = joint_equations + self.__get_equations(a, j+1)
 
                 # print('\n\t>>> joint_{}<<<\n'.format(j+1))
                 # print(time[t-1], time[t], joint_position_0[q] * mul, joint_velocity_0[j], joint_position_f[q] * mul, joint_velocity_f[j])
@@ -229,7 +234,7 @@ class System:
                 
                 # TODO: print the table
 
-            plt = PlotGrid(1, len(joint_equations), *joint_equations)
+            PlotGrid(3, len(self.joint_type), *joint_equations)
 
             joint_position_0 = joint_position_f  
             joint_velocity_0 = joint_velocity_f
