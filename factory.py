@@ -23,6 +23,10 @@ class Factory:
                     DH(0, 0, 0, 0, Joint.PRISMATIC, 3)
                     ]),
                 System([
+                    DH(0.1, 0, .2, 0 , Joint.REVOLUTE, 1),
+                    DH(0.2, pi / 2, 0, 0, Joint.PRISMATIC, 2),
+                ]),
+                System([
                     DH(0, -pi/2, 0, 0,Joint.REVOLUTE,1),
                     DH(0, pi/2, 2, 0,Joint.REVOLUTE,2),
                     DH(0, 0, 0, 0,Joint.PRISMATIC,3),
@@ -57,6 +61,7 @@ class Factory:
     def get_joint_variables(self):
         return [
                 {'t1':pi/2, 'd2':.5, 'd3':.5},
+                {'t1':pi/2, 'd2':.3},
                 {'t1':pi/2, 't2':pi/2, 'd3':3, 't4':pi/2, 't5':pi/2, 't6':pi/2},
                 {'t1': 1.21284847806357, 't2': -1.6646842190241}
                 ][self.i]
@@ -64,7 +69,9 @@ class Factory:
     def get_end_effector(self):
         #TODO: add all 3 
         return [
-                [1, -1.2, 2, 0.694738276196703, 0, 1.570796]
+                [1, -1.2, 2, 0.694738276196703, 0, 1.570796],
+                [0, .3, .5, pi/2, 0, pi/2],
+                [1, -1.2, 2, 0, pi/2, 0],
                 ][self.i]
 
     def get_cubic_vars(self):

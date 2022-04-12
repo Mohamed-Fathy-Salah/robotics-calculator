@@ -4,6 +4,7 @@ library to process forward kinamatics, inverse kinamatics, jacobian, inverse jac
 import numpy as np
 from enum import Enum
 from sympy import *
+from sympy.core.numbers import Float
 from sympy.plotting import PlotGrid
 
 class System:
@@ -30,12 +31,12 @@ class System:
     def forward_kinamatics(self, joint_variables):
         # compensate in T0n with joint_variables & return x, y, z, phi, theta, psi
         tmp = self.T[-1].subs(joint_variables)
-        x = tmp[0, 3]
-        y = tmp[1, 3]
-        z = tmp[2, 3]
-        phi = atan2(tmp[1, 0], tmp[0, 0])
-        psi = atan2(tmp[2, 1], tmp[2, 2])
-        theta = atan2(-tmp[2,0], sqrt(1-tmp[2,0]**2))
+        x = tmp[0, 3].evalf()
+        y = tmp[1, 3].evalf()
+        z = tmp[2, 3].evalf()
+        phi = atan2(tmp[1, 0], tmp[0, 0]).evalf()
+        psi = atan2(tmp[2, 1], tmp[2, 2]).evalf()
+        theta = atan2(-tmp[2,0], sqrt(1-tmp[2,0]**2)).evalf()
         print("x:{} y:{} z:{} phi:{} theta:{} psi:{}".format(x, y, z, phi, theta, psi))
         return [x, y, z, phi, theta, psi]
 
@@ -46,19 +47,23 @@ class System:
                 self.T[-1][2, 3] - z,
                 ]
 
-        if phi != None: 
-            all_equations = all_equations + [
-                    atan(self.T[-1][1, 0] / self.T[-1][0, 0]) - phi,
-                    atan(-self.T[-1][2, 0] / sqrt(1 - self.T[-1][2, 0]**2)) - theta,
-                    atan(self.T[-1][2, 1] / self.T[-1][2, 2]) - psi
-                    ]
+        if phi != None and self.T[-1][0, 0] != 0:
+                all_equations.append(atan2(self.T[-1][1, 0],self.T[-1][0, 0]) - phi)
+
+        if theta != None and sqrt((1-self.T[-1][2, 0]**2)) != 0:
+                all_equations.append(atan2(-self.T[-1][2, 0],sqrt((1-self.T[-1][2, 0]**2))) - theta)
+
+        if psi != None and self.T[-1][2, 2] != 0:
+                all_equations.append(atan2(self.T[-1][2, 1],self.T[-1][2, 2]) - psi)
 
         # remove non symbolic equations 
         equations = list()
         for equation in all_equations:
-            if type(equation) != float and equation !=0 and type(equation) != calculus.accumulationbounds.AccumulationBounds: 
+            equation = equation.evalf().simplify()
+            if type(equation) != Float and equation !=0 and type(equation) != calculus.accumulationbounds.AccumulationBounds: 
                 equations.append(equation)
 
+        pprint(equations)
         solutions =  solve(equations, dict=True)
         print(solutions)
         return solutions 
